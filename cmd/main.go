@@ -14,7 +14,7 @@ import (
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	fmt.Printf("1 - gorutine count - %d\n", runtime.NumGoroutine())
-	cache, err := go_size_ttl_cache.NewMemoryCache[int, int64](1000)
+	cache, err := go_size_ttl_cache.NewMemoryCache[int, int64](1000, go_size_ttl_cache.DefaultGCDuration, time.Millisecond*100)
 	_ = cache.Put(999, 999, go_size_ttl_cache.NoExpiration)
 	if err != nil {
 		log.Fatalf("can't create cache because - %s", err.Error())
@@ -102,7 +102,7 @@ func main() {
 	fmt.Printf("5 - gorutine count - %d\n", runtime.NumGoroutine())
 
 	for i := 0; i < 57; i++ {
-		err = cache.Put(i, int64(i), time.Millisecond*100)
+		err = cache.Put(i, int64(i), go_size_ttl_cache.DefaultExpiration)
 		if err != nil {
 			log.Printf("can't add to cache (%v, %v) because - %s", i, i, err.Error())
 		}

@@ -9,26 +9,36 @@ import (
 
 type memoryCache[TKey comparable, TValue any] struct {
 	sync.RWMutex
-	capBytes      int
-	elems         map[TKey]cacheElem[TKey, TValue]
-	closeCh       chan struct{}
-	cleanCh       chan TKey
-	checkerTicker *time.Ticker
-	isClose       bool
+	capBytes          int
+	elems             map[TKey]cacheElem[TKey, TValue]
+	defaultExpiration time.Duration
+	closeCh           chan struct{}
+	cleanCh           chan TKey
+	checkerTicker     *time.Ticker
+	isClose           bool
 }
 
-func NewMemoryCache[TKey comparable, TValue any](capMB int) (SizedTTLCache[TKey, TValue], error) {
+func NewMemoryCache[TKey comparable, TValue any](
+	capMB int,
+	GCDuration time.Duration,
+	defaultExpiration time.Duration) (SizedTTLCache[TKey, TValue], error) {
+
 	if capMB <= 0 {
 		return nil, ErrCapMBHasZeroOrLessValue
 	}
 
+	if defaultExpiration <= 0 {
+		return nil, ErrDefaultExpirationZeroOrLess
+	}
+
 	cache := &memoryCache[TKey, TValue]{
-		capBytes:      capMB,
-		elems:         make(map[TKey]cacheElem[TKey, TValue]),
-		closeCh:       make(chan struct{}),
-		cleanCh:       make(chan TKey, 10),
-		checkerTicker: time.NewTicker(500 * time.Millisecond),
-		isClose:       false,
+		capBytes:          capMB,
+		elems:             make(map[TKey]cacheElem[TKey, TValue]),
+		defaultExpiration: defaultExpiration,
+		closeCh:           make(chan struct{}),
+		cleanCh:           make(chan TKey, 10),
+		checkerTicker:     time.NewTicker(GCDuration),
+		isClose:           false,
 	}
 
 	go cache.cleaner()
@@ -38,6 +48,10 @@ func NewMemoryCache[TKey comparable, TValue any](capMB int) (SizedTTLCache[TKey,
 }
 
 func (m *memoryCache[TKey, TValue]) Put(key TKey, value TValue, ttl time.Duration) error {
+	if ttl == DefaultExpiration {
+		ttl = m.defaultExpiration
+	}
+
 	newElem := newCacheElem[TKey, TValue](ttl, value, key)
 	size, err := newElem.size()
 	if err != nil {

@@ -6,14 +6,22 @@ import (
 )
 
 const (
+	// DefaultGCDuration дефолтный период отчистки элементов, чей TTL закончился.
+	DefaultGCDuration = time.Millisecond * 300
+
+	// NoExpiration указывается при Put методе, чтобы элемент кэша НИКОГДА не был удален.
 	NoExpiration time.Duration = -1
+
+	// DefaultExpiration указывается при Put методе, чтобы использовать дефолтный TTL, указанный в экземпляре кэша.
+	DefaultExpiration time.Duration = 0
 )
 
 var (
-	ErrCapMBHasZeroOrLessValue = errors.New("cache size in megabytes can't be less or equal to zero")
-	ErrElemNotFound            = errors.New("can't find element with specified key")
-	ErrNotEnoughSpace          = errors.New("can't add element - not enough space")
-	ErrCacheClosed             = errors.New("can't work with the cache after it is closed")
+	ErrCapMBHasZeroOrLessValue     = errors.New("cache size in megabytes can't be less or equal to zero")
+	ErrElemNotFound                = errors.New("can't find element with specified key")
+	ErrNotEnoughSpace              = errors.New("can't add element - not enough space")
+	ErrCacheClosed                 = errors.New("can't work with the cache after it is closed")
+	ErrDefaultExpirationZeroOrLess = errors.New("can't create cache with default expiration equal to or less than 0")
 )
 
 // SizedTTLCache интерфейс для работы с кэшом.
