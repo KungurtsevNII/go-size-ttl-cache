@@ -15,6 +15,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	fmt.Printf("1 - gorutine count - %d\n", runtime.NumGoroutine())
 	cache, err := go_size_ttl_cache.NewMemoryCache[int, int64](1000)
+	_ = cache.Put(999, 999, go_size_ttl_cache.NoExpiration)
 	if err != nil {
 		log.Fatalf("can't create cache because - %s", err.Error())
 	}
@@ -86,6 +87,13 @@ func main() {
 				} else {
 					log.Printf("gorutine cache count (%d)", c)
 				}
+
+				space, err := cache.FreeSpace()
+				if err != nil {
+					log.Printf("gorutine can't get free space because - %s", err.Error())
+				} else {
+					log.Printf("gorutine free space (%d)bytes", space)
+				}
 				time.Sleep(time.Millisecond * 10)
 			}
 		}
@@ -127,6 +135,14 @@ func main() {
 	time.Sleep(time.Second * 5)
 
 	cancel()
+
+	v, err := cache.Get(999)
+	if err != nil {
+		fmt.Printf("вечный не на месте - %s\n", err.Error())
+	} else {
+		fmt.Printf("вечный на месте - %v\n", v)
+	}
+
 	cache.Close()
 
 	fmt.Printf("7 - gorutine count - %d\n", runtime.NumGoroutine())

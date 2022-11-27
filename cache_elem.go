@@ -3,15 +3,13 @@ package go_size_ttl_cache
 import (
 	"bytes"
 	"encoding/gob"
-	"sync"
 	"time"
 )
 
 type cacheElem[TKey comparable, TValue any] struct {
-	DestructionTime time.Time
+	DestructionTime int64
 	Value           TValue
 	Key             TKey
-	mx              sync.Mutex
 }
 
 func newCacheElem[TKey comparable, TValue any](
@@ -19,8 +17,15 @@ func newCacheElem[TKey comparable, TValue any](
 	value TValue,
 	key TKey) cacheElem[TKey, TValue] {
 
+	var destructionTime int64
+	if ttl == NoExpiration {
+		destructionTime = 0
+	} else {
+		destructionTime = time.Now().UTC().Add(ttl).Unix()
+	}
+
 	return cacheElem[TKey, TValue]{
-		DestructionTime: time.Now().UTC().Add(ttl),
+		DestructionTime: destructionTime,
 		Value:           value,
 		Key:             key,
 	}
@@ -28,17 +33,14 @@ func newCacheElem[TKey comparable, TValue any](
 
 // isExpired вышло ли время жизини элемента.
 func (e cacheElem[TKey, TValue]) isExpired() bool {
-	return time.Now().UTC().Unix() > e.DestructionTime.Unix()
-}
+	if e.DestructionTime == 0 {
+		return false
+	}
 
-func (e cacheElem[TKey, TValue]) update(ttl time.Duration, value TValue) {
-	e.Value = value
-	e.DestructionTime = time.Now().UTC().Add(ttl)
+	return time.Now().UTC().Unix() > e.DestructionTime
 }
 
 func (e cacheElem[TKey, TValue]) size() (int, error) {
-	e.mx.Lock()
-	defer e.mx.Unlock()
 	b := new(bytes.Buffer)
 	if err := gob.NewEncoder(b).Encode(e); err != nil {
 		return 0, err

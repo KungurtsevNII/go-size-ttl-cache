@@ -5,6 +5,10 @@ import (
 	"time"
 )
 
+const (
+	NoExpiration time.Duration = -1
+)
+
 var (
 	ErrCapMBHasZeroOrLessValue = errors.New("cache size in megabytes can't be less or equal to zero")
 	ErrElemNotFound            = errors.New("can't find element with specified key")

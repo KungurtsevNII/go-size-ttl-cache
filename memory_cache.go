@@ -45,7 +45,9 @@ func (m *memoryCache[TKey, TValue]) Put(key TKey, value TValue, ttl time.Duratio
 	}
 
 	m.RLock()
+
 	if m.isClose {
+		m.RUnlock()
 		return ErrCacheClosed
 	}
 
@@ -55,19 +57,11 @@ func (m *memoryCache[TKey, TValue]) Put(key TKey, value TValue, ttl time.Duratio
 		return err
 	}
 	canPut := freeSpace-size >= 0
-
-	elem, ok := m.elems[key]
-	if ok {
+	if _, ok := m.elems[key]; !ok && !canPut {
 		m.RUnlock()
-		elem.update(ttl, value)
-		return nil
-	}
-
-	m.RUnlock()
-
-	if !canPut {
 		return ErrNotEnoughSpace
 	}
+	m.RUnlock()
 
 	m.Lock()
 	m.elems[key] = newElem
@@ -79,6 +73,7 @@ func (m *memoryCache[TKey, TValue]) Get(key TKey) (value TValue, err error) {
 	m.RLock()
 
 	if m.isClose {
+		m.RUnlock()
 		err = ErrCacheClosed
 		return
 	}
@@ -117,18 +112,20 @@ func (m *memoryCache[TKey, TValue]) Delete(key TKey) error {
 
 func (m *memoryCache[TKey, TValue]) Exists(key TKey) (bool, error) {
 	m.RLock()
-	defer m.RUnlock()
 
 	if m.isClose {
+		m.RUnlock()
 		return false, ErrCacheClosed
 	}
 
 	elem, ok := m.elems[key]
 	if elem.isExpired() {
+		m.RUnlock()
 		m.cleanCh <- key
 		return false, nil
 	}
 
+	m.RUnlock()
 	return ok, nil
 }
 
@@ -193,9 +190,7 @@ func (m *memoryCache[TKey, TValue]) Close() {
 
 	m.isClose = true
 
-	for _, v := range m.elems {
-		delete(m.elems, v.Key)
-	}
+	m.elems = make(map[TKey]cacheElem[TKey, TValue])
 }
 
 func (m *memoryCache[TKey, TValue]) cleaner() {
@@ -218,15 +213,28 @@ func (m *memoryCache[TKey, TValue]) checker() {
 	for {
 		select {
 		case <-m.checkerTicker.C:
+			toClear := m.expiredKeys()
+			if len(toClear) == 0 {
+				return
+			}
 			m.Lock()
-			for _, v := range m.elems {
-				if v.isExpired() {
-					delete(m.elems, v.Key)
-				}
+			for _, k := range toClear {
+				delete(m.elems, k)
 			}
 			m.Unlock()
 		case <-m.closeCh:
 			return
 		}
 	}
+}
+
+func (m *memoryCache[TKey, TValue]) expiredKeys() (keys []TKey) {
+	m.RLock()
+	defer m.RUnlock()
+	for key, itm := range m.elems {
+		if itm.isExpired() {
+			keys = append(keys, key)
+		}
+	}
+	return
 }
